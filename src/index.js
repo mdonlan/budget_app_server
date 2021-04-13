@@ -4,6 +4,7 @@ const bodyParser = require('body-parser');
 const superagent = require('superagent');
 const { Client } = require('pg')
 const Pool = require('pg').Pool;
+const jwt = require('jsonwebtoken');
 
 const app = express();
 app.use(cors())
@@ -20,11 +21,11 @@ const port = 3000;
 // await client.end()
 
 const pool = new Pool({
-  user: 'me',
+  user: 'postgres',
   host: 'localhost',
   database: 'budget_app',
   password: 'password',
-  port: 5432,
+  // port: 5432,
 })
 
 // const name = "test transactions 01";
@@ -91,27 +92,37 @@ app.post('/create_transaction', async (req, res) => {
 	console.log(req.body)
 })
 
-app.listen(port, () => {
-	console.log(`Server is listening on port ${port}`);
-})
-
 async function get_user_transactions() {
 	const results = await pool.query('SELECT * FROM transactions');
 	// console.log(results.rows);
 	return results.rows;
 }
 
-/*
-axios.get('https://www.opensecrets.org/api/?method=getLegislators&id=NJ&apikey=22691594f640230fd8ca371699406559')
-  .then(function (response) {
-    // handle success
-    console.log(response);
+app.post('/register_user', function(req, res) {
+  console.log('register user')
+  // console.log(req.body);
+
+  pool.query('INSERT INTO users (email, username, password) VALUES ($1, $2, $3)', [req.body.email, req.body.username, req.body.password], (error, results) => {
+      if (error) {
+          console.log(error);
+          if (error.constraint == 'unique_email') {
+              res.status(422).send('Error -- Email has already been registered');
+          } else if (error.constraint == 'unique_username') {
+              res.status(422).send('Error -- Username has already been registered');
+              
+          } else if (error.code == '23502') {
+              res.status(422).send('Error -- A field was left empty, please fill all fields!');
+          }  else {
+              res.status(400).send("Unknown error during registration");
+          }
+      } else {
+          // console.log(results);
+          const token = jwt.sign({ username: req.body.username }, 'private_key');
+          res.status(201).send({ message: `Registered user successfully!`, token: token });
+      }
   })
-  .catch(function (error) {
-    // handle error
-    console.log(error);
-  })
-  .then(function () {
-    // always executed
-  });
-*/
+})
+
+app.listen(port, () => {
+	console.log(`Server is listening on port ${port}`);
+})
