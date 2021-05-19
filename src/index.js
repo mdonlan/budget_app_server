@@ -23,7 +23,7 @@ const pool = new Pool({
 
 app.get('/', async (req, res) => {
 	console.log('root request')
-	res.send(await get_user_transactions());
+	// res.send(await get_user_transactions());
 })
 
 app.post('/create_transaction', async (req, res) => {
@@ -33,7 +33,7 @@ app.post('/create_transaction', async (req, res) => {
 
   const transaction = req.body.transaction;
   const date = new Date();
-  const username = jwt.decode(req.body.token, 'private_key');
+  const username = jwt.decode(req.body.token, 'private_key').username;
 
   pool.query('INSERT INTO transactions (name, date, amount, type, note, category, username) VALUES ($1, $2, $3, $4, $5, $6, $7)', [transaction.name, date, transaction.amount, transaction.type, transaction.note, transaction.category, username], (error, results) => {
     if (error) {
@@ -41,14 +41,14 @@ app.post('/create_transaction', async (req, res) => {
     } else {
       console.log('created new transaction');
     }
-})
+  })
 })
 
-async function get_user_transactions() {
-	const results = await pool.query('SELECT * FROM transactions');
-	// console.log(results.rows);
-	return results.rows;
-}
+// async function get_user_transactions() {
+// 	const results = await pool.query('SELECT * FROM transactions');
+// 	// console.log(results.rows);
+// 	return results.rows;
+// }
 
 app.post('/register_user', function(req, res) {
   console.log('register user')
@@ -180,18 +180,53 @@ app.post('/create_category', function(req, res) {
 })
 
 app.post('/get_categories', function(req, res) {
-  console.log('getting categories');
-  console.log(req.body)
-  
+    const decoded = jwt.verify(req.body.token, 'private_key');
+
+    pool.query('SELECT * FROM categories WHERE username = $1', [decoded.username], (error, results) => {
+        if (error) console.log(error);
+        else {
+            console.log(results)
+            res.status(200).send({ categories: results.rows });
+        }
+    })
+})
+
+app.post('/get_transactions', function(req, res) {
+    const decoded = jwt.verify(req.body.token, 'private_key');
+
+    pool.query('SELECT * FROM transactions WHERE username = $1', [decoded.username], (error, results) => {
+        if (error) console.log(error);
+        else {
+            res.status(200).send({ transactions: results.rows });
+        }
+    })
+})
+
+app.post('/get_accounts', function(req, res) {
   const decoded = jwt.verify(req.body.token, 'private_key');
 
-  pool.query('SELECT * FROM categories WHERE username = $1', [decoded.username], (error, results) => {
-    if (error) console.log(error);
-    else {
-      console.log(results)
-      res.status(200).send({ categories: results.rows });
-    }
+  pool.query('SELECT * FROM accounts WHERE username = $1', [decoded.username], (error, results) => {
+      if (error) console.log(error);
+      else {
+          res.status(200).send({ accounts: results.rows });
+      }
   })
- 
+})
 
+app.post('/create_account', async (req, res) => {
+	console.log('create account')
+	// console.log(req)
+	console.log(req.body)
+
+	const transaction = req.body.account;
+	const date = new Date();
+	const username = jwt.decode(req.body.token, 'private_key').username;
+
+	pool.query('INSERT INTO accounts (name, amount, username, date) VALUES ($1, $2, $3, $4)', [transaction.name, transaction.amount, username, date], (error, results) => {
+	if (error) {
+	console.log(error);
+	} else {
+	console.log('created new transaction');
+	}
+	})
 })
