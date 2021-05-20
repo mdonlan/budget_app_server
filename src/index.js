@@ -35,6 +35,12 @@ app.post('/create_transaction', async (req, res) => {
   const date = new Date();
   const username = jwt.decode(req.body.token, 'private_key').username;
 
+  // get the associated account and category
+  console.log(transaction)
+  const account = await pool.query('SELECT * FROM accounts WHERE username = $1 AND name = $2', [username, transaction.account]);
+  console.log(account.rows); 
+//   const category = await pool.query('SELECT * FROM categories WHERE username = $1 AND name')
+
   pool.query('INSERT INTO transactions (name, date, amount, type, note, category, username) VALUES ($1, $2, $3, $4, $5, $6, $7)', [transaction.name, date, transaction.amount, transaction.type, transaction.note, transaction.category, username], (error, results) => {
     if (error) {
         console.log(error);
