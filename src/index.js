@@ -27,25 +27,50 @@ app.get('/', async (req, res) => {
 })
 
 app.post('/create_transaction', async (req, res) => {
-	console.log('create transaction')
+	console.log('start of create transaction')
 	// console.log(req)
-	console.log(req.body)
+	// console.log(req.body)
+	if (!req.body.token) {
+		res.send('no username');
+		return;
+	}
+	
 
   const transaction = req.body.transaction;
   const date = new Date();
   const username = jwt.decode(req.body.token, 'private_key').username;
+	// console.log('username: ' + username);
 
-  // get the associated account and category
-  console.log(transaction)
-  const account = await pool.query('SELECT * FROM accounts WHERE username = $1 AND name = $2', [username, transaction.account]);
-  console.log(account.rows); 
+	//
+  	// get the associated account and category
+	
+
+	
+//   console.log(transaction)
+  const account_info = await pool.query('SELECT * FROM accounts WHERE username = $1 AND name = $2', [username, transaction.account]);
+  console.log(account_info.rows); 
 //   const category = await pool.query('SELECT * FROM categories WHERE username = $1 AND name')
+	const account_name = account_info.rows[0].name;
+	console.log("account name: " + account_name);
+	const new_amount = account_info.rows[0].amount + transaction.amount;
+	if (account_name) {
+		pool.query('UPDATE accounts SET amount = $1 WHERE username = $2 AND name = $3', [new_amount, username, account_name], (error, results) => {
+			if (error) {
+				console.log(error);
+			} else {
+				console.log('updated the associated account')
+			}
+		})
+	} else {
+		console.log("ERROR: invalid account name");
+	}
 
   pool.query('INSERT INTO transactions (name, date, amount, type, note, category, username) VALUES ($1, $2, $3, $4, $5, $6, $7)', [transaction.name, date, transaction.amount, transaction.type, transaction.note, transaction.category, username], (error, results) => {
     if (error) {
         console.log(error);
     } else {
       console.log('created new transaction');
+	  res.send("created transaction successfully!")
     }
   })
 })
