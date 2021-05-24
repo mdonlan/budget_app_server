@@ -46,13 +46,19 @@ app.post('/create_transaction', async (req, res) => {
 	
 
 	
-//   console.log(transaction)
+  console.log(transaction)
   const account_info = await pool.query('SELECT * FROM accounts WHERE username = $1 AND name = $2', [username, transaction.account]);
   console.log(account_info.rows); 
 //   const category = await pool.query('SELECT * FROM categories WHERE username = $1 AND name')
 	const account_name = account_info.rows[0].name;
 	console.log("account name: " + account_name);
-	const new_amount = account_info.rows[0].amount + transaction.amount;
+	
+	let value = parseInt(transaction.amount);
+	if (transaction.type == "Outflow") value *= -1;
+	let new_amount = parseInt(account_info.rows[0].amount) + value;
+
+	console.log("new_amount: " + new_amount);
+
 	if (account_name) {
 		pool.query('UPDATE accounts SET amount = $1 WHERE username = $2 AND name = $3', [new_amount, username, account_name], (error, results) => {
 			if (error) {
@@ -83,7 +89,7 @@ app.post('/create_transaction', async (req, res) => {
 
 app.post('/register_user', function(req, res) {
   console.log('register user')
-  console.log(req.body);
+//   console.log(req.body);
 
   const username = req.body.username;
   const password = req.body.password;
@@ -116,18 +122,18 @@ app.listen(port, () => {
 
 app.post('/login', function(req, res) {
   console.log('login')
-  console.log(req.body);
+//   console.log(req.body);
 
   const username = req.body.username;
   const password = req.body.password;
-  console.log(username, password)
+//   console.log(username, password)
 
   pool.query('SELECT * FROM users WHERE username = $1 AND password = $2', [username, password], (error, results) => {
     if (error) {
         console.log(error);
     } else {
-        console.log("row_count: " + results.rowCount);
-        console.log("rows: \n", results.rows);
+        // console.log("row_count: " + results.rowCount);
+        // console.log("rows: \n", results.rows);
         if (results.rowCount > 0) {
           // res.status(200).send({valid_token: valid_login, username: })
           const token = jwt.sign({ username: username }, 'private_key');
@@ -165,10 +171,10 @@ app.post('/login', function(req, res) {
 
 app.post('/validate_token', function(req, res) {
   console.log('attempting to validate token')
-  console.log(req.body);
+//   console.log(req.body);
 
   const decoded = jwt.verify(req.body.token, 'private_key');
-  console.log(decoded)
+//   console.log(decoded)
 
   pool.query('SELECT * FROM users WHERE username = $1', [decoded.username], (error, results) => {
       if (error) {
@@ -188,7 +194,7 @@ app.post('/validate_token', function(req, res) {
 
 app.post('/create_category', function(req, res) {
   console.log('attempting to create a new budget category');
-  console.log(req.body)
+//   console.log(req.body)
 
   const decoded = jwt.verify(req.body.token, 'private_key');
 
@@ -247,7 +253,7 @@ app.post('/get_accounts', function(req, res) {
 app.post('/create_account', async (req, res) => {
 	console.log('create account')
 	// console.log(req)
-	console.log(req.body)
+	// console.log(req.body)
 
 	const transaction = req.body.account;
 	const date = new Date();
