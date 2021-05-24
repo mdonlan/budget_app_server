@@ -22,7 +22,7 @@ const pool = new Pool({
 })
 
 app.get('/', async (req, res) => {
-	console.log('root request')
+	// console.log('root request')
 	// res.send(await get_user_transactions());
 })
 
@@ -46,19 +46,20 @@ app.post('/create_transaction', async (req, res) => {
 	
 
 	
-  console.log(transaction)
+//   console.log(transaction)
   const account_info = await pool.query('SELECT * FROM accounts WHERE username = $1 AND name = $2', [username, transaction.account]);
-  console.log(account_info.rows); 
+//   console.log(account_info.rows); 
 //   const category = await pool.query('SELECT * FROM categories WHERE username = $1 AND name')
 	const account_name = account_info.rows[0].name;
-	console.log("account name: " + account_name);
+	// console.log("account name: " + account_name);
 	
 	let value = parseInt(transaction.amount);
 	if (transaction.type == "Outflow") value *= -1;
 	let new_amount = parseInt(account_info.rows[0].amount) + value;
 
-	console.log("new_amount: " + new_amount);
+	// console.log("new_amount: " + new_amount);
 
+  // update the account
 	if (account_name) {
 		pool.query('UPDATE accounts SET amount = $1 WHERE username = $2 AND name = $3', [new_amount, username, account_name], (error, results) => {
 			if (error) {
@@ -71,7 +72,29 @@ app.post('/create_transaction', async (req, res) => {
 		console.log("ERROR: invalid account name");
 	}
 
-  pool.query('INSERT INTO transactions (name, date, amount, type, note, category, username) VALUES ($1, $2, $3, $4, $5, $6, $7)', [transaction.name, date, transaction.amount, transaction.type, transaction.note, transaction.category, username], (error, results) => {
+  // update the category
+  const category_name = transaction.category;
+  console.log('category_name: ' + category_name);
+  const new_category_amount = value + parseInt(account_info.rows[0].amount);
+  const category_info = await pool.query('SELECT * FROM categories WHERE username = $1 AND name = $2', [username, transaction.category]);
+  if (transaction.type != category_info.rows[0].type) {
+    console.log('category found was wrong Type');
+  }
+
+	if (category_name) {
+		pool.query('UPDATE categories SET current_amount = $1 WHERE username = $2 AND name = $3', [new_category_amount, username, category_name], (error, results) => {
+			if (error) {
+				console.log(error);
+			} else {
+				console.log('updated the associated category')
+			}
+		})
+	} else {
+		console.log("ERROR: invalid category name");
+	}
+
+
+  pool.query('INSERT INTO transactions (name, date, amount, type, note, category, username, account) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [transaction.name, date, transaction.amount, transaction.type, transaction.note, transaction.category, username, transaction.account], (error, results) => {
     if (error) {
         console.log(error);
     } else {
@@ -222,7 +245,7 @@ app.post('/get_categories', function(req, res) {
     pool.query('SELECT * FROM categories WHERE username = $1', [decoded.username], (error, results) => {
         if (error) console.log(error);
         else {
-            console.log(results)
+            // console.log(results)
             res.status(200).send({ categories: results.rows });
         }
     })
@@ -266,4 +289,26 @@ app.post('/create_account', async (req, res) => {
 	console.log('created new transaction');
 	}
 	})
+})
+
+app.post('/delete_category', async (req, res) => {
+	console.log('delete category endpoint')
+
+	const category = req.body.category;
+	const username = jwt.decode(req.body.token, 'private_key').username;
+
+  pool.query('DELETE FROM categories WHERE username = $1 AND name = $2 AND id = $3', [username, category.name, category.id])
+  .then(res => console.log(res))
+  .catch(err => console.log(err))
+})
+
+app.post('/delete_transaction', async (req, res) => {
+	console.log('delete transaction endpoint')
+
+	const transaction = req.body.transaction;
+	const username = jwt.decode(req.body.token, 'private_key').username;
+
+  pool.query('DELETE FROM transactions WHERE username = $1 AND name = $2 AND id = $3', [username, transaction.name, transaction.id])
+  .then(res => console.log(res))
+  .catch(err => console.log(err))
 })
