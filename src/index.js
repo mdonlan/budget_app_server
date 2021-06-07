@@ -5,6 +5,7 @@ const superagent = require('superagent');
 const { Client } = require('pg')
 const Pool = require('pg').Pool;
 const jwt = require('jsonwebtoken');
+const routes = require('./routes/routes.js');
 
 const app = express();
 app.use(cors())
@@ -21,88 +22,9 @@ const pool = new Pool({
   // port: 5432,
 })
 
-app.get('/', async (req, res) => {
-	// console.log('root request')
-	// res.send(await get_user_transactions());
-})
+// app.get('/', (req, res) => {routes.root(req, res)})
 
-app.post('/create_transaction', async (req, res) => {
-	console.log('start of create transaction')
-	// console.log(req)
-	// console.log(req.body)
-	if (!req.body.token) {
-		res.send('no username');
-		return;
-	}
-	
-
-  const transaction = req.body.transaction;
-  const date = new Date();
-  const username = jwt.decode(req.body.token, 'private_key').username;
-	// console.log('username: ' + username);
-
-	//
-  	// get the associated account and category
-	
-
-	
-//   console.log(transaction)
-  const account_info = await pool.query('SELECT * FROM accounts WHERE username = $1 AND name = $2', [username, transaction.account]);
-//   console.log(account_info.rows); 
-//   const category = await pool.query('SELECT * FROM categories WHERE username = $1 AND name')
-	const account_name = account_info.rows[0].name;
-	// console.log("account name: " + account_name);
-	
-	let value = parseInt(transaction.amount);
-	if (transaction.type == "Outflow") value *= -1;
-	let new_amount = parseInt(account_info.rows[0].amount) + value;
-
-	// console.log("new_amount: " + new_amount);
-
-  // update the account
-	if (account_name) {
-		pool.query('UPDATE accounts SET amount = $1 WHERE username = $2 AND name = $3', [new_amount, username, account_name], (error, results) => {
-			if (error) {
-				console.log(error);
-			} else {
-				console.log('updated the associated account')
-			}
-		})
-	} else {
-		console.log("ERROR: invalid account name");
-	}
-
-  // update the category
-  const category_name = transaction.category;
-  console.log('category_name: ' + category_name);
-  const new_category_amount = value + parseInt(account_info.rows[0].amount);
-  const category_info = await pool.query('SELECT * FROM categories WHERE username = $1 AND name = $2', [username, transaction.category]);
-  if (transaction.type != category_info.rows[0].type) {
-    console.log('category found was wrong Type');
-  }
-
-	if (category_name) {
-		pool.query('UPDATE categories SET current_amount = $1 WHERE username = $2 AND name = $3', [new_category_amount, username, category_name], (error, results) => {
-			if (error) {
-				console.log(error);
-			} else {
-				console.log('updated the associated category')
-			}
-		})
-	} else {
-		console.log("ERROR: invalid category name");
-	}
-
-
-  pool.query('INSERT INTO transactions (name, date, amount, type, note, category, username, account) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [transaction.name, date, transaction.amount, transaction.type, transaction.note, transaction.category, username, transaction.account], (error, results) => {
-    if (error) {
-        console.log(error);
-    } else {
-      console.log('created new transaction');
-	  res.send("created transaction successfully!")
-    }
-  })
-})
+app.post('/create_transaction', (req, res) => {routes.create_transaction(req, res, pool)})
 
 // async function get_user_transactions() {
 // 	const results = await pool.query('SELECT * FROM transactions');
@@ -192,28 +114,7 @@ app.post('/login', function(req, res) {
   // })
 })
 
-app.post('/validate_token', function(req, res) {
-  console.log('attempting to validate token')
-//   console.log(req.body);
-
-  const decoded = jwt.verify(req.body.token, 'private_key');
-//   console.log(decoded)
-
-  pool.query('SELECT * FROM users WHERE username = $1', [decoded.username], (error, results) => {
-      if (error) {
-          console.log(error);
-      } else {
-          // console.log(results);
-          if (results.rowCount > 0) {
-            if (results.rows[0].username == decoded.username) {
-              res.status(200).send({ valid_token: true, username: decoded.username });
-            }
-          }
-          
-          // res.status(200).json(results.rows);
-      }
-  })
-})
+app.post('/validate_token', (req, res) => {routes.validate_token(req, res, pool)})
 
 app.post('/create_category', function(req, res) {
   console.log('attempting to create a new budget category');
