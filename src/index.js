@@ -116,6 +116,7 @@ app.post('/login', function(req, res) {
 
 app.post('/validate_token', (req, res) => {routes.validate_token(req, res, pool)})
 app.post('/create_category', function(req, res) {routes.create_category(req, res, pool)})
+app.post('/delete_transaction', function(req, res) {routes.delete_transaction(req, res, pool)})
 
 
 
@@ -186,17 +187,3 @@ app.post('/delete_category', async (req, res) => {
   })
 })
 
-app.post('/delete_transaction', async (req, res) => {
-	console.log('delete transaction endpoint')
-
-	const transaction = req.body.transaction;
-	const username = jwt.decode(req.body.token, 'private_key').username;
-
-  pool.query('DELETE FROM transactions WHERE username = $1 AND name = $2 AND id = $3', [username, transaction.name, transaction.id], (error, results) => {
-    if (error) console.log(error);
-    else {
-      console.log('deleted transaction successfully!');
-      res.send("deleted transaction successfully!")
-    }
-  })
-})

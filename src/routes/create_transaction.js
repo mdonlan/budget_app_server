@@ -21,8 +21,8 @@ module.exports = async function create_transaction(req, res, pool) {
 	}
 	
 	/* update the account's amount */
-	let account_amount = parseInt(account_info.rows[0].amount);
-	let transaction_amount = parseInt(transaction.amount);
+	let account_amount = parseFloat(account_info.rows[0].amount);
+	let transaction_amount = parseFloat(transaction.amount);
 	let new_account_amount = account_amount + transaction_amount;
 
 	// pool.query('UPDATE accounts SET amount = $1 WHERE username = $2 AND name = $3', [new_amount, username, account_name], (error, results) => {
@@ -34,7 +34,7 @@ module.exports = async function create_transaction(req, res, pool) {
 	const category_name = transaction.category;
 	const category_info = await pool.query('SELECT * FROM categories WHERE username = $1 AND name = $2', [username, transaction.category]);
 	console.log("category_info: ", category_info)
-	const current_category_amount = parseInt(category_info.rows[0].current_amount);
+	const current_category_amount = parseFloat(category_info.rows[0].current_amount);
 	const new_category_amount = current_category_amount + transaction_amount;
 
 	pool.query('UPDATE categories SET current_amount = $1 WHERE username = $2 AND name = $3', [new_category_amount, username, category_name], (error, results) => {
