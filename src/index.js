@@ -118,7 +118,7 @@ app.post('/validate_token', (req, res) => {routes.validate_token(req, res, pool)
 
 app.post('/create_category', function(req, res) {
   console.log('attempting to create a new budget category');
-//   console.log(req.body)
+  console.log(req.body)
 
   const decoded = jwt.verify(req.body.token, 'private_key');
 
