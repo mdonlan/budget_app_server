@@ -115,30 +115,9 @@ app.post('/login', function(req, res) {
 })
 
 app.post('/validate_token', (req, res) => {routes.validate_token(req, res, pool)})
-
-app.post('/create_category', function(req, res) {
-  console.log('attempting to create a new budget category');
-  console.log(req.body)
-
-  const decoded = jwt.verify(req.body.token, 'private_key');
-
-  pool.query('INSERT INTO categories (name, type, username, current_amount, total_amount) VALUES ($1, $2, $3, $4, $5)', [req.body.category.name, req.body.category.type, decoded.username, req.body.category.current_amount, req.body.category.total_amount], (error, results) => {
-    if (error) console.log(error);
-    else {
-      
-    }
-  })
-    //     if (error) {
-  // pool.query('SELECT * FROM categories WHERE username = $1', [decoded.username], (error, results) => {
-  //   if (error) {
-  //     console.log(error);
-  //   } else {
-      
-  //   }
-  // })
+app.post('/create_category', function(req, res) {routes.create_category(req, res, pool)})
 
 
-})
 
 app.post('/get_categories', function(req, res) {
     const decoded = jwt.verify(req.body.token, 'private_key');
@@ -198,9 +177,13 @@ app.post('/delete_category', async (req, res) => {
 	const category = req.body.category;
 	const username = jwt.decode(req.body.token, 'private_key').username;
 
-  pool.query('DELETE FROM categories WHERE username = $1 AND name = $2 AND id = $3', [username, category.name, category.id])
-  .then(res => console.log(res))
-  .catch(err => console.log(err))
+  pool.query('DELETE FROM categories WHERE username = $1 AND name = $2 AND id = $3', [username, category.name, category.id], (error, results) => {
+    if (error) console.log(error);
+    else {
+      console.log('deleted category successfully!');
+      res.send("deleted category successfully!")
+    }
+  })
 })
 
 app.post('/delete_transaction', async (req, res) => {
@@ -209,7 +192,11 @@ app.post('/delete_transaction', async (req, res) => {
 	const transaction = req.body.transaction;
 	const username = jwt.decode(req.body.token, 'private_key').username;
 
-  pool.query('DELETE FROM transactions WHERE username = $1 AND name = $2 AND id = $3', [username, transaction.name, transaction.id])
-  .then(res => console.log(res))
-  .catch(err => console.log(err))
+  pool.query('DELETE FROM transactions WHERE username = $1 AND name = $2 AND id = $3', [username, transaction.name, transaction.id], (error, results) => {
+    if (error) console.log(error);
+    else {
+      console.log('deleted transaction successfully!');
+      res.send("deleted transaction successfully!")
+    }
+  })
 })
