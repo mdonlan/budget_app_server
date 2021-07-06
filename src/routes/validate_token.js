@@ -2,7 +2,14 @@ const jwt = require('jsonwebtoken');
 
 module.exports = async function validate_token(req, res, pool) {
     console.log('attempting to validate token')
-  
+
+    const token = req.body.token;
+    if (!token) {
+        res.status(200).send({ valid_token: false, username: null });
+        return;
+    }
+
+    // if there was a token, check it
     const decoded = jwt.verify(req.body.token, 'private_key');
   
     await pool.query('SELECT * FROM users WHERE username = $1', [decoded.username], (error, results) => {
@@ -13,7 +20,7 @@ module.exports = async function validate_token(req, res, pool) {
                     res.status(200).send({ valid_token: true, username: decoded.username });
                 }
             } else {
-                res.status(200).send({ valid_token: false, username: decoded.username });
+                res.status(200).send({ valid_token: false, username: null });
             }
         }
     })

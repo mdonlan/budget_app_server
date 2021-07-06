@@ -22,6 +22,8 @@ const pool = new Pool({
   // port: 5432,
 })
 
+// console.log(pool)
+
 // app.get('/', (req, res) => {routes.root(req, res)})
 
 app.post('/create_transaction', (req, res) => {routes.create_transaction(req, res, pool)})
@@ -40,18 +42,25 @@ app.post('/register_user', function(req, res) {
   const password = req.body.password;
   const email = req.body.email;
 
+  // check to make sure username is unique
+  // const users_with_name = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+  // if (users_with_name.rows.length > 0) {
+  //   res.status(200).send('Error -- Username is already taken.')
+  // }
+
   pool.query('INSERT INTO users (email, username, password) VALUES ($1, $2, $3)', [email, username, password], (error, results) => {
       if (error) {
-          console.log(error);
+          // console.log(error);
+          console.log(error.constraint)
           if (error.constraint == 'unique_email') {
-              res.status(422).send('Error -- Email has already been registered');
+              res.status(200).send({ message: 'Error -- Email has already been registered.' });
           } else if (error.constraint == 'unique_username') {
-              res.status(422).send('Error -- Username has already been registered');
+              res.status(200).send({ message: 'Error -- Username has already been registered.' });
               
           } else if (error.code == '23502') {
-              res.status(422).send('Error -- A field was left empty, please fill all fields!');
+              res.status(200).send({ message: 'Error -- A field was left empty, please fill all fields!'});
           }  else {
-              res.status(400).send("Unknown error during registration");
+              res.status(200).send({ message: "Unknown error during registration"});
           }
       } else {
           // console.log(results);
@@ -73,9 +82,12 @@ app.post('/login', function(req, res) {
   const password = req.body.password;
 //   console.log(username, password)
 
+  
+
   pool.query('SELECT * FROM users WHERE username = $1 AND password = $2', [username, password], (error, results) => {
     if (error) {
         console.log(error);
+        res.status(401).send({message: 'Failed to login'})
     } else {
         // console.log("row_count: " + results.rowCount);
         // console.log("rows: \n", results.rows);
