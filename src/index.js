@@ -42,6 +42,11 @@ app.post('/register_user', function(req, res) {
   const password = req.body.password;
   const email = req.body.email;
 
+  if (username.length == 0 || password.length == 0 || email.length == 0) {
+    res.status(200).send({ message: "Error -- Field was empty."});
+    return;
+  }
+
   // check to make sure username is unique
   // const users_with_name = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
   // if (users_with_name.rows.length > 0) {

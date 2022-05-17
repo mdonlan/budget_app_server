@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 
 module.exports = async function create_transaction(req, res, pool) {
-    console.log('start of create transaction')
+	console.log('\n\n----------------------------');
+    console.log('start of create transaction');
 	
 	if (!req.body.token) {
 		res.send('no username');
@@ -18,6 +19,9 @@ module.exports = async function create_transaction(req, res, pool) {
 	if (!account_name) {
 		console.log("ERROR: invalid account name when attempting to create new transaction");
 		res.status(422).send('ERROR: invalid account name when attempting to create new transaction');
+		return;
+	} else {
+		console.log('Found matching account to update -- acount_name: ' + account_name);
 	}
 	
 	/* update the account's amount */
@@ -25,17 +29,24 @@ module.exports = async function create_transaction(req, res, pool) {
 	let transaction_amount = parseFloat(transaction.amount);
 	let new_account_amount = account_amount + transaction_amount;
 
-	// pool.query('UPDATE accounts SET amount = $1 WHERE username = $2 AND name = $3', [new_amount, username, account_name], (error, results) => {
-	// 	if (error) console.log(error);
-	// 	else console.log('updated the associated account with the new transaction');
-	// })
+	console.log('account_ammount: ' + account_amount);
+	console.log('transaction_ammount: ' + transaction_amount);
+	console.log('new_account_ammount: ' + new_account_amount);
+
+	pool.query('UPDATE accounts SET amount = $1 WHERE username = $2 AND name = $3', [new_account_amount, username, account_name], (error, results) => {
+		if (error) console.log(error);
+		else console.log('updated the associated account with the new transaction');
+	})
 
 	/* update the category amount */
 	const category_name = transaction.category;
 	const category_info = await pool.query('SELECT * FROM categories WHERE username = $1 AND name = $2', [username, transaction.category]);
-	console.log("category_info: ", category_info)
+	console.log("category_name: ", category_info.rows[0].name);
 	const current_category_amount = parseFloat(category_info.rows[0].current_amount);
 	const new_category_amount = current_category_amount + transaction_amount;
+
+	console.log('current_category_ammount: ' + current_category_amount);
+	console.log('new_category_ammount: ' + new_category_amount);
 
 	pool.query('UPDATE categories SET current_amount = $1 WHERE username = $2 AND name = $3', [new_category_amount, username, category_name], (error, results) => {
 		if (error) console.log(error);
@@ -49,4 +60,7 @@ module.exports = async function create_transaction(req, res, pool) {
 			res.send("created transaction successfully!")
 		}
 	})
+
+	console.log('end of create_transaction');
+	console.log('----------------------------\n\n');
 }
