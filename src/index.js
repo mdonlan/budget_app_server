@@ -5,7 +5,6 @@ const superagent = require('superagent');
 const { Client } = require('pg')
 const Pool = require('pg').Pool;
 const jwt = require('jsonwebtoken');
-const routes = require('./routes/routes.js');
 
 const app = express();
 app.use(cors())
@@ -22,11 +21,18 @@ const pool = new Pool({
   // port: 5432,
 })
 
-// console.log(pool)
+app.post('/create_transaction', (req, res) => {
+  const date = new Date();
+  const transaction = req.body.transaction;
+  const username = jwt.decode(req.body.token, 'private_key').username;
 
-// app.get('/', (req, res) => {routes.root(req, res)})
-
-app.post('/create_transaction', (req, res) => {routes.create_transaction(req, res, pool)})
+	pool.query('INSERT INTO transactions (name, date, tags, username, value) VALUES ($1, $2, $3, $4, $5)', [transaction.name, date, transaction.tags, username, transaction.value], (error, results) => {
+    if (error) console.log(error);
+      else {
+        res.send("created transaction successfully!")
+    }
+	})
+})
 
 // async function get_user_transactions() {
 // 	const results = await pool.query('SELECT * FROM transactions');
@@ -131,22 +137,75 @@ app.post('/login', function(req, res) {
   // })
 })
 
-app.post('/validate_token', (req, res) => {routes.validate_token(req, res, pool)})
-app.post('/create_category', function(req, res) {routes.create_category(req, res, pool)})
-app.post('/delete_transaction', function(req, res) {routes.delete_transaction(req, res, pool)})
+app.post('/validate_token', async (req, res) => {
+  console.log('attempting to validate token')
 
+    const token = req.body.token;
+    if (!token) {
+        res.status(200).send({ valid_token: false, username: null });
+        return;
+    }
 
-
-app.post('/get_categories', function(req, res) {
+    // if there was a token, check it
     const decoded = jwt.verify(req.body.token, 'private_key');
-
-    pool.query('SELECT * FROM categories WHERE username = $1', [decoded.username], (error, results) => {
+  
+    await pool.query('SELECT * FROM users WHERE username = $1', [decoded.username], (error, results) => {
         if (error) console.log(error);
         else {
-            // console.log(results)
-            res.status(200).send({ categories: results.rows });
+            if (results.rowCount > 0) {
+                if (results.rows[0].username == decoded.username) {
+                    res.status(200).send({ valid_token: true, username: decoded.username });
+                }
+            } else {
+                res.status(200).send({ valid_token: false, username: null });
+            }
         }
     })
+})
+app.post('/delete_transaction', async function(req, res) {
+  if (!req.body.token) {
+		res.send('no username');
+		return;
+	}
+
+    /*
+        delete_transaction
+        1. find the transaction by its name/id in the db
+        2. get the transaction amount and its category
+        3. delete the transaction in db
+        4. update the category amount to reverse the transaction
+    */
+	
+    const transaction_id = req.body.transaction_id;
+    const username = jwt.decode(req.body.token, 'private_key').username;
+    
+    const transaction_query = await pool.query('SELECT * FROM transactions WHERE username = $1 AND id = $2', [username, transaction_id]);
+    const transaction_data = transaction_query.rows[0];
+
+    console.log('transaction_data')
+    console.log(transaction_data)
+
+    const transaction_amount = parseFloat(transaction_data.amount);
+    const transaction_category = transaction_data.category;
+
+    const category_name = transaction_data.category;
+	const category_data = await pool.query('SELECT * FROM categories WHERE username = $1 AND name = $2', [username, category_name]);
+	const current_category_amount = parseFloat(category_data.rows[0].current_amount);
+	const new_category_amount = current_category_amount - transaction_amount;
+
+    pool.query('DELETE FROM transactions WHERE username = $1 AND name = $2 AND id = $3', [username, transaction_data.name, transaction_data.id], (error, results) => {
+        if (error) console.log(error);
+        else {
+            console.log('deleted transaction successfully!');
+            res.send("deleted transaction successfully!")
+        }
+    })
+
+    pool.query('UPDATE categories SET current_amount = $1 WHERE username = $2 AND name = $3', [new_category_amount, username, category_name], (error, results) => {
+		if (error) console.log(error);
+		else console.log('updated the associated category amount')
+	})
+
 })
 
 app.post('/get_transactions', function(req, res) {
@@ -159,48 +218,3 @@ app.post('/get_transactions', function(req, res) {
         }
     })
 })
-
-app.post('/get_accounts', function(req, res) {
-  const decoded = jwt.verify(req.body.token, 'private_key');
-
-  pool.query('SELECT * FROM accounts WHERE username = $1', [decoded.username], (error, results) => {
-      if (error) console.log(error);
-      else {
-          res.status(200).send({ accounts: results.rows });
-      }
-  })
-})
-
-app.post('/create_account', async (req, res) => {
-	console.log('create account')
-	// console.log(req)
-	// console.log(req.body)
-
-	const transaction = req.body.account;
-	const date = new Date();
-	const username = jwt.decode(req.body.token, 'private_key').username;
-
-	pool.query('INSERT INTO accounts (name, amount, username, date) VALUES ($1, $2, $3, $4)', [transaction.name, transaction.amount, username, date], (error, results) => {
-	if (error) {
-	console.log(error);
-	} else {
-	console.log('created new transaction');
-	}
-	})
-})
-
-app.post('/delete_category', async (req, res) => {
-	console.log('delete category endpoint')
-
-	const category = req.body.category;
-	const username = jwt.decode(req.body.token, 'private_key').username;
-
-  pool.query('DELETE FROM categories WHERE username = $1 AND name = $2 AND id = $3', [username, category.name, category.id], (error, results) => {
-    if (error) console.log(error);
-    else {
-      console.log('deleted category successfully!');
-      res.send("deleted category successfully!")
-    }
-  })
-})
-
