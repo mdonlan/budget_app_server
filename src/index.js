@@ -376,7 +376,7 @@ app.post('/get_transaction_numbers_data', async function(req, res) {
      }); 
   })
 
-  app.post('/get_tags', function (req, res) {
+app.post('/get_tags', function (req, res) {
     console.log("get_tags route");
     const decoded = jwt.verify(req.body.token, 'private_key');
 
@@ -386,4 +386,54 @@ app.post('/get_transaction_numbers_data', async function(req, res) {
             res.status(200).send({ tags: results.rows });
         }
     })
-})
+});
+
+app.post('/get_popular_tags', function (req, res) {
+    console.log("get_popular_tags route");
+    const decoded = jwt.verify(req.body.token, 'private_key');
+
+    pool.query('SELECT * FROM transactions WHERE username = $1', [decoded.username], (error, results) => {
+        if (error) console.log(error);
+        else {
+
+            const popular_tags = [];
+
+            for (let i = 0; i < results.rows.length; i++) {
+                const transaction = results.rows[i];
+                
+                transaction.tags.forEach(transaction_tag => {
+                    let matched = false;
+                    popular_tags.forEach(pop_tag => {
+                        if (pop_tag.value == transaction_tag) {
+                            matched = true;
+                            pop_tag.count++;
+                        }
+                    });
+
+                    if (!matched) {
+                        const new_pop_tag = {
+                            value: transaction_tag,
+                            count: 1
+                        };
+                        popular_tags.push(new_pop_tag);
+                    }
+                });
+            }
+
+            // function compare( a, b ) {
+            //     if ( a.last_nom < b.last_nom ){
+            //       return -1;
+            //     }
+            //     if ( a.last_nom > b.last_nom ){
+            //       return 1;
+            //     }
+            //     return 0;
+            //   }
+              
+            popular_tags.sort((a, b) => {return b.count - a.count});
+
+            console.log(popular_tags);
+            res.status(200).send({ popular_tags: popular_tags });
+        }
+    })
+});
