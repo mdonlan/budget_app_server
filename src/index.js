@@ -39,6 +39,44 @@ app.post('/create_transaction', (req, res) => {
             res.send("created transaction successfully!")
         }
     })
+
+    // check tags against existing tags for user
+    // if there are new tags then add them to the tags db
+    pool.query('SELECT * FROM tags WHERE username = $1', [username], (error, results) => {
+        if (error) console.log(error);
+        else {
+            console.log(results.rows)
+            const tags_that_dont_exist = [];
+            transaction.tags.forEach(tag => {
+                console.log("tag: " + tag);
+                // console.log(results)
+                let tag_exists = false;
+                results.rows.forEach((row, i) => {
+                    console.log(row.value);
+                    if (tag == row.value) {
+                        tag_exists = true;
+                    }
+                });
+
+                if (!tag_exists) {
+                    tags_that_dont_exist.push(tag);
+                }
+            });
+            
+
+            console.log(tags_that_dont_exist)
+            tags_that_dont_exist.forEach(tag => {
+                pool.query('INSERT INTO tags (value, username) VALUES ($1, $2)', [tag, username], (error, results) => {
+                    if (error) console.log(error);
+                    else {
+                        // res.send("added new tag successfully!")
+                    }
+                })
+            });
+        }
+    })
+
+    
 })
 
 // async function get_user_transactions() {
@@ -337,3 +375,15 @@ app.post('/get_transaction_numbers_data', async function(req, res) {
         num_day_transactions: num_day_transactions
      }); 
   })
+
+  app.post('/get_tags', function (req, res) {
+    console.log("get_tags route");
+    const decoded = jwt.verify(req.body.token, 'private_key');
+
+    pool.query('SELECT * FROM tags WHERE username = $1', [decoded.username], (error, results) => {
+        if (error) console.log(error);
+        else {
+            res.status(200).send({ tags: results.rows });
+        }
+    })
+})
