@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const start_of_week = require('date-fns/startOfWeek');
 const end_of_week = require('date-fns/endOfWeek');
 const is_same_day = require('date-fns/isSameDay');
+import { parseISO, startOfDay } from 'date-fns';
 // const start_of_week = require('date-fns/startOfWeek');
 
 import { Request, Response, NextFunction } from 'express';
@@ -37,7 +38,7 @@ app.use(cors())
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-const port = 3000;
+const port = 3001;
 
 const pool = new Pool({
     user: 'postgres',
@@ -52,7 +53,20 @@ app.post('/create_transaction', (req: Request, res: Response) => {
     const transaction = req.body.transaction;
     const username = jwt.decode(req.body.token, 'private_key').username;
 
-    pool.query('INSERT INTO transactions (name, date, tags, username, value) VALUES ($1, $2, $3, $4, $5)', [transaction.name, transaction.date, transaction.tags, username, transaction.value], (error: Error, results: QueryResult) => {
+    // console.log("new transaction date");
+    // console.log(transaction.date);
+    // console.log("new transaction date formatted");
+    // console.log(parseISO(transaction.date));
+
+    // const date = new Date()
+    // console.log()
+    console.log("transaction date: " + new Date(transaction.date));
+    // date.totime
+    // const date = new Date('2018-09-01T16:01:36.386Z')
+    // const timeZone = 'Europe/Berlin'
+    // const zonedDate = utcToZonedTime(date, timeZone)
+
+    pool.query('INSERT INTO transactions (name, date, tags, username, value) VALUES ($1, $2, $3, $4, $5)', [transaction.name, new Date(transaction.date), transaction.tags, username, transaction.value], (error: Error, results: QueryResult) => {
         if (error) console.log(error);
         else {
             res.send("created transaction successfully!")
@@ -145,7 +159,7 @@ app.post('/register_user', function (req: Request, res: Response) {
     })
 })
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
     console.log(`Server is listening on port ${port}`);
 })
 
@@ -196,35 +210,17 @@ app.post('/validate_token', async (req: Request, res: Response) => {
     })
 })
 app.post('/delete_transaction', async function (req: Request, res: Response) {
-    if (!req.body.token) {
-        res.send('no username');
-        return;
-    }
-
-    /*
-        delete_transaction
-        1. find the transaction by its name/id in the db
-        2. get the transaction amount and its category
-        3. delete the transaction in db
-        4. update the category amount to reverse the transaction
-    */
-
+    console.log("delete_transaction route");
     const transaction_id = req.body.transaction_id;
     const username = jwt.decode(req.body.token, 'private_key').username;
 
     const transaction_query = await pool.query('SELECT * FROM transactions WHERE username = $1 AND id = $2', [username, transaction_id]);
     const transaction_data = transaction_query.rows[0];
 
-    console.log('transaction_data')
-    console.log(transaction_data)
+    // console.log('transaction_data')
+    // console.log(transaction_data)
 
     const transaction_amount = parseFloat(transaction_data.amount);
-    const transaction_category = transaction_data.category;
-
-    const category_name = transaction_data.category;
-    const category_data = await pool.query('SELECT * FROM categories WHERE username = $1 AND name = $2', [username, category_name]);
-    const current_category_amount = parseFloat(category_data.rows[0].current_amount);
-    const new_category_amount = current_category_amount - transaction_amount;
 
     pool.query('DELETE FROM transactions WHERE username = $1 AND name = $2 AND id = $3', [username, transaction_data.name, transaction_data.id], (error: any, results: QueryResult) => {
         if (error) console.log(error);
@@ -233,12 +229,6 @@ app.post('/delete_transaction', async function (req: Request, res: Response) {
             res.send("deleted transaction successfully!")
         }
     })
-
-    pool.query('UPDATE categories SET current_amount = $1 WHERE username = $2 AND name = $3', [new_category_amount, username, category_name], (error: any, results: QueryResult) => {
-        if (error) console.log(error);
-        else console.log('updated the associated category amount')
-    })
-
 })
 
 app.post('/get_transactions', function (req: Request, res: Response) {
@@ -416,7 +406,15 @@ app.post('/get_amount_spent_by_tags', function (req: Request, res: Response) {
     console.log("get_amount_spent_by_tags route");
     const decoded = jwt.verify(req.body.token, 'private_key');
 
-    pool.query('SELECT * FROM transactions WHERE username = $1', [decoded.username], (error: any, results: QueryResult) => {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const days_in_month = new Date(year, month, 0).getDate() + 1;
+    const month_start = new Date(year, month);
+    const month_end = new Date(year, month, days_in_month);
+
+    // only get data for this month??
+    pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [decoded.username, month_start, month_end], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else {
             const spending_tags: Spending_Tag[] = [];
@@ -440,6 +438,10 @@ app.post('/get_amount_spent_by_tags', function (req: Request, res: Response) {
                         spending_tags.push(new_spending_tag);
                     }
                 });
+            }
+
+            if (spending_tags.length == 0) {
+                
             }
               
             spending_tags.sort((a, b) => {return b.amount - a.amount});
