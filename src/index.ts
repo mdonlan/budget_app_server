@@ -8,7 +8,8 @@ const jwt = require('jsonwebtoken');
 const start_of_week = require('date-fns/startOfWeek');
 const end_of_week = require('date-fns/endOfWeek');
 const is_same_day = require('date-fns/isSameDay');
-import { parseISO, startOfDay } from 'date-fns';
+const addDays = require('date-fns/addDays')
+import { endOfYear, parseISO, startOfDay, startOfYear } from 'date-fns';
 // const start_of_week = require('date-fns/startOfWeek');
 
 import { Request, Response, NextFunction } from 'express';
@@ -244,6 +245,70 @@ app.post('/get_transactions', function (req: Request, res: Response) {
             res.status(200).send({ transactions: results.rows });
         }
     })
+})
+
+app.post('/get_time_period_data', async function (req: Request, res: Response) {
+    console.log("Route -> /get_time_period_data");
+    const decoded = jwt.verify(req.body.token, 'private_key');
+    const time_period = req.body.time_period;
+
+    const date = new Date();
+    let start = null;
+    let end = null;
+
+    if (time_period == 0) {
+        console.log("time_period: day");
+        start = new Date();
+        end = new Date();
+        // addDays(start, 1);
+    } else if (time_period == 1) {
+        console.log("time_period: week");
+        
+        start = start_of_week(date);
+        end = end_of_week(date);
+    } else if (time_period == 2) {
+        console.log("time_period: month");
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const days_in_month = new Date(year, month, 0).getDate() + 1;
+        start = new Date(year, month);
+        end = new Date(year, month, days_in_month);
+    }
+    else if (time_period == 3) {
+        console.log("time_period: year");
+        start = startOfYear(date);
+        end = endOfYear(date);
+    }
+
+    if (!start || !end) {
+        res.status(200).send("Blah");
+        return;
+    }
+
+    const query_resp: QueryResult = await pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [decoded.username, start, end]);
+    console.log(query_resp.rows);
+
+    const data = {num_transactions: query_resp.rowCount, money_spent: 0};
+    
+    query_resp.rows.forEach(row => {
+        data.money_spent += row.value;
+    });
+
+    res.status(200).send(data);
+
+    // const date = new Date();
+    // const year = date.getFullYear();
+    // const month = date.getMonth();
+    // const days_in_month = new Date(year, month, 0).getDate() + 1;
+    // const start = new Date(year, month);
+    // const end = new Date(year, month, days_in_month);
+
+    // pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [decoded.username, start, end], (error: any, results: QueryResult) => {
+    //     if (error) console.log(error);
+    //     else {
+    //         res.status(200).send({ transactions: results.rows });
+    //     }
+    // })
 })
 
 app.post('/get_month_data', function (req: Request, res: Response) {
