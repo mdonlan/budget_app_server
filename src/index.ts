@@ -118,6 +118,10 @@ app.post('/create_transaction', (req: Request, res: Response) => {
 // 	return results.rows;
 // }
 
+app.get('/', (req: Request, res: Response) => {
+    res.status(200).send("Hello from Budget Server!");
+});
+
 app.post('/register_user', function (req: Request, res: Response) {
     console.log('register user')
     //   console.log(req.body);
