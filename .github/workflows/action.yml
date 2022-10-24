@@ -19,10 +19,7 @@ jobs:
         with:
             node-version: ${{ matrix.node-version }}
       - run: npm install
-#      - run: npm run build --if-present
-#      - run: npm test
-#      - run: pm2 restart budget_server
-      - run: pm2 restart Budget_Server
+      - run: pm2 start Budget_Server
 
 #    strategy:
 #      matrix:
