@@ -9,11 +9,13 @@ const start_of_week = require('date-fns/startOfWeek');
 const end_of_week = require('date-fns/endOfWeek');
 const is_same_day = require('date-fns/isSameDay');
 const addDays = require('date-fns/addDays')
-import { endOfYear, parseISO, startOfDay, startOfYear } from 'date-fns';
+import { endOfMonth, endOfWeek, endOfYear, parseISO, startOfDay, startOfMonth, startOfWeek, startOfYear } from 'date-fns';
 // const start_of_week = require('date-fns/startOfWeek');
 
 import { Request, Response, NextFunction } from 'express';
 import { QueryResult } from 'pg';
+
+require('dotenv').config()
 
 var types = require('pg').types
 types.setTypeParser(1700, function (val: string) {
@@ -34,6 +36,13 @@ interface Transaction {
     username: string;
 };
 
+export enum Time_Period {
+    DAY,
+    WEEK,
+    MONTH,
+    YEAR
+}
+
 const app = express();
 app.use(cors())
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -45,7 +54,7 @@ const pool = new Pool({
     user: 'postgres',
     host: 'localhost',
     database: 'budget_app',
-    password: 'password',
+    password: process.env.DB_PASSWORD,
     // port: 5432,
 })
 
@@ -474,21 +483,39 @@ app.post('/get_popular_tags', function (req: Request, res: Response) {
 app.post('/get_amount_spent_by_tags', function (req: Request, res: Response) {
     console.log("get_amount_spent_by_tags route");
     const decoded = jwt.verify(req.body.token, 'private_key');
+    const time_period = req.body.time_period;
 
     const date = new Date();
     const year = date.getFullYear();
-    const month = date.getMonth();
-    const days_in_month = new Date(year, month, 0).getDate() + 1;
-    const month_start = new Date(year, month);
-    const month_end = new Date(year, month, days_in_month);
+    // const month = date.getMonth();
+    // const days_in_month = new Date(year, month, 0).getDate() + 1;
+    // const month_start = new Date(year, month);
+    // const month_end = new Date(year, month, days_in_month);
+
+    let start = null;
+    let end = null;
+
+    if (time_period == Time_Period.WEEK) {
+        start = startOfWeek(date);
+        end = endOfWeek(date);
+    } else if (time_period == Time_Period.MONTH) {
+        start = startOfMonth(date);
+        end = endOfMonth(date);
+    }
+
+    console.assert(start && end);
+    console.log("start: " + start);
+    console.log("end: " + end);
 
     // only get data for this month??
-    pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [decoded.username, month_start, month_end], (error: any, results: QueryResult) => {
+    pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [decoded.username, start, end], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else {
+            console.log("row_count: " + results.rowCount)
             const spending_tags: Spending_Tag[] = [];
             for (let i = 0; i < results.rows.length; i++) {
                 const transaction: Transaction = results.rows[i];
+                console.log("transaction: ", transaction)
 
                 transaction.tags.forEach((transaction_tag: string) => {
                     let matched = false;
@@ -515,7 +542,7 @@ app.post('/get_amount_spent_by_tags', function (req: Request, res: Response) {
               
             spending_tags.sort((a, b) => {return b.amount - a.amount});
 
-            // console.log(spending_tags);
+            console.log("spending_tags: " + spending_tags);
             res.status(200).send({ spending_tags: spending_tags });
         }
     })
