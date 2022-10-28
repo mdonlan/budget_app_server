@@ -51,16 +51,18 @@ app.use(bodyParser.json());
 const port = 3001;
 
 const pool = new Pool({
-    user: 'postgres',
-    host: 'localhost',
     database: 'budget_app',
-    password: process.env.DB_PASSWORD,
 })
 
 pool.on('connect', (client: Client) => {
     console.log('connected to pool');
-    console.log(client)
+    // console.log(client)
 })
+
+pool.on('error', (err: Error, client: Client) => {
+    console.log("POOL ERROR");
+    console.log(err);
+});
 
 app.post('/create_transaction', (req: Request, res: Response) => {
     // const date = new Date();
