@@ -17,7 +17,7 @@ import { Client, QueryResult } from 'pg';
 
 // require('dotenv').config()
 const path = require('path')
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') })
+require('dotenv').config()
 // require('dotenv').config({ debug: process.env.DEBUG })
 console.log(process.env.PG_PASSWORD)
 
