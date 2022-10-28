@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors')
 const bodyParser = require('body-parser');
 const superagent = require('superagent');
-const { Client } = require('pg')
+// const { Client } = require('pg')
 const Pool = require('pg').Pool;
 const jwt = require('jsonwebtoken');
 const start_of_week = require('date-fns/startOfWeek');
@@ -13,7 +13,7 @@ import { endOfMonth, endOfWeek, endOfYear, parseISO, startOfDay, startOfMonth, s
 // const start_of_week = require('date-fns/startOfWeek');
 
 import { Request, Response, NextFunction } from 'express';
-import { QueryResult } from 'pg';
+import { Client, QueryResult } from 'pg';
 
 require('dotenv').config()
 
@@ -55,7 +55,11 @@ const pool = new Pool({
     host: 'localhost',
     database: 'budget_app',
     password: process.env.DB_PASSWORD,
-    // port: 5432,
+})
+
+pool.on('connect', (client: Client) => {
+    console.log('connected to pool');
+    console.log(client)
 })
 
 app.post('/create_transaction', (req: Request, res: Response) => {
