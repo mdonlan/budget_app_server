@@ -16,6 +16,7 @@ import { Request, Response, NextFunction } from 'express';
 import { Client, QueryResult } from 'pg';
 
 require('dotenv').config()
+console.log(process.env)
 
 var types = require('pg').types
 types.setTypeParser(1700, function (val: string) {
