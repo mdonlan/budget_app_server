@@ -15,8 +15,9 @@ import { endOfMonth, endOfWeek, endOfYear, parseISO, startOfDay, startOfMonth, s
 import { Request, Response, NextFunction } from 'express';
 import { Client, QueryResult } from 'pg';
 
-require('dotenv').config()
-console.log(process.env)
+// require('dotenv').config()
+require('dotenv').config({ debug: process.env.DEBUG })
+console.log(process.env.PG_PASSWORD)
 
 var types = require('pg').types
 types.setTypeParser(1700, function (val: string) {
