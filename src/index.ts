@@ -52,7 +52,8 @@ const port = 3001;
 
 const pool = new Pool({
     user: 'postgres',
-    // host: 'localhost',
+    password: process.env.PG_PASSWORD,
+    host: 'localhost',
     database: 'budget_app',
 })
 
