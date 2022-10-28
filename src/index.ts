@@ -51,6 +51,8 @@ app.use(bodyParser.json());
 const port = 3001;
 
 const pool = new Pool({
+    user: 'postgres',
+    // host: 'localhost',
     database: 'budget_app',
 })
 
