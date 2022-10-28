@@ -17,9 +17,10 @@ import { Client, QueryResult } from 'pg';
 
 // require('dotenv').config()
 const path = require('path')
-require('dotenv').config()
-// require('dotenv').config({ debug: process.env.DEBUG })
+// require('dotenv').config()
+require('dotenv').config({ debug: process.env.DEBUG })
 console.log(process.env.PG_PASSWORD)
+console.log(process.env)
 
 var types = require('pg').types
 types.setTypeParser(1700, function (val: string) {
