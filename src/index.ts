@@ -2,26 +2,23 @@ const express = require('express');
 const cors = require('cors')
 const bodyParser = require('body-parser');
 const superagent = require('superagent');
-// const { Client } = require('pg')
 const Pool = require('pg').Pool;
 const jwt = require('jsonwebtoken');
 const start_of_week = require('date-fns/startOfWeek');
 const end_of_week = require('date-fns/endOfWeek');
 const is_same_day = require('date-fns/isSameDay');
 const addDays = require('date-fns/addDays')
-import { endOfMonth, endOfWeek, endOfYear, parseISO, startOfDay, startOfMonth, startOfWeek, startOfYear } from 'date-fns';
-// const start_of_week = require('date-fns/startOfWeek');
-
-import { Request, Response, NextFunction } from 'express';
+import { endOfMonth, endOfWeek, endOfYear, startOfMonth, startOfWeek, startOfYear } from 'date-fns';
+import { Request, Response } from 'express';
 import { Client, QueryResult } from 'pg';
 
-// require('dotenv').config()
-const path = require('path')
-// require('dotenv').config()
-// require('dotenv').config({ debug: process.env.DEBUG })
+// check /root and base of project for .env files
 require('dotenv').config({path:'/root/.env'})
-// console.log(process.env.PG_PASSWORD)
-// console.log(process.env)
+require('dotenv').config()
+
+console.log(process.env.JWT_SECRET_KEY);
+
+const secret_key = process.env.JWT_SECRET_KEY;
 
 var types = require('pg').types
 types.setTypeParser(1700, function (val: string) {
@@ -63,33 +60,36 @@ const pool = new Pool({
     database: 'budget_app',
 })
 
-pool.on('connect', (client: Client) => {
-    console.log('connected to pool');
-    // console.log(client)
-})
+// pool.on('connect', (client: Client) => {
+//     console.log('connected to pool');
+//     // console.log(client)
+// })
 
 pool.on('error', (err: Error, client: Client) => {
     console.log("POOL ERROR");
     console.log(err);
 });
 
+function get_username(token: string) {
+    let decoded: any = null;
+    try {
+        decoded = jwt.verify(token, secret_key);
+    } catch (e) {
+        console.log("jwt -- failed to decode token, invalid secret_key");
+        console.log(e);
+        return null;
+    }
+
+    return decoded.username; 
+}
+
 app.post('/create_transaction', (req: Request, res: Response) => {
-    // const date = new Date();
     const transaction = req.body.transaction;
-    const username = jwt.decode(req.body.token, 'private_key').username;
-
-    // console.log("new transaction date");
-    // console.log(transaction.date);
-    // console.log("new transaction date formatted");
-    // console.log(parseISO(transaction.date));
-
-    // const date = new Date()
-    // console.log()
-    console.log("transaction date: " + new Date(transaction.date));
-    // date.totime
-    // const date = new Date('2018-09-01T16:01:36.386Z')
-    // const timeZone = 'Europe/Berlin'
-    // const zonedDate = utcToZonedTime(date, timeZone)
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
 
     pool.query('INSERT INTO transactions (name, date, tags, username, value) VALUES ($1, $2, $3, $4, $5)', [transaction.name, new Date(transaction.date), transaction.tags, username, transaction.value], (error: Error, results: QueryResult) => {
         if (error) console.log(error);
@@ -103,14 +103,11 @@ app.post('/create_transaction', (req: Request, res: Response) => {
     pool.query('SELECT * FROM tags WHERE username = $1', [username], (error: Error, results: QueryResult) => {
         if (error) console.log(error);
         else {
-            console.log(results.rows)
+            // console.log(results.rows)
             const tags_that_dont_exist: string[] = [];
             transaction.tags.forEach((tag: string) => {
-                console.log("tag: " + tag);
-                // console.log(results)
                 let tag_exists = false;
                 results.rows.forEach((row, i) => {
-                    console.log(row.value);
                     if (tag == row.value) {
                         tag_exists = true;
                     }
@@ -121,27 +118,14 @@ app.post('/create_transaction', (req: Request, res: Response) => {
                 }
             });
             
-
-            console.log(tags_that_dont_exist)
             tags_that_dont_exist.forEach(tag => {
                 pool.query('INSERT INTO tags (value, username) VALUES ($1, $2)', [tag, username], (error: Error, results: QueryResult) => {
                     if (error) console.log(error);
-                    else {
-                        // res.send("added new tag successfully!")
-                    }
                 })
             });
         }
-    })
-
-    
+    })    
 })
-
-// async function get_user_transactions() {
-// 	const results = await pool.query('SELECT * FROM transactions');
-// 	// console.log(results.rows);
-// 	return results.rows;
-// }
 
 app.get('/', (req: Request, res: Response) => {
     res.status(200).send("Hello from Budget Server!");
@@ -149,7 +133,6 @@ app.get('/', (req: Request, res: Response) => {
 
 app.post('/register_user', function (req: Request, res: Response) {
     console.log('register user')
-    //   console.log(req.body);
 
     const username = req.body.username;
     const password = req.body.password;
@@ -160,15 +143,8 @@ app.post('/register_user', function (req: Request, res: Response) {
         return;
     }
 
-    // check to make sure username is unique
-    // const users_with_name = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-    // if (users_with_name.rows.length > 0) {
-    //   res.status(200).send('Error -- Username is already taken.')
-    // }
-
     pool.query('INSERT INTO users (email, username, password) VALUES ($1, $2, $3)', [email, username, password], (error: any, results: QueryResult) => {
         if (error) {
-            // console.log(error);
             console.log(error.constraint)
             if (error.constraint == 'unique_email') {
                 res.status(200).send({ message: 'Error -- Email has already been registered.' });
@@ -181,8 +157,7 @@ app.post('/register_user', function (req: Request, res: Response) {
                 res.status(200).send({ message: "Unknown error during registration" });
             }
         } else {
-            // console.log(results);
-            const token = jwt.sign({ username: username }, 'private_key');
+            const token = jwt.sign({ username: username }, secret_key);
             res.status(201).send({ message: `Registered user successfully!`, token: token });
         }
     })
@@ -204,7 +179,7 @@ app.post('/login', function (req: Request, res: Response) {
             res.status(401).send({ message: 'Failed to login' })
         } else {
             if (results.rowCount > 0) {
-                const token = jwt.sign({ username: username }, 'private_key');
+                const token = jwt.sign({ username: username }, secret_key);
                 res.status(200).send({ message: `Logged in successfully!`, token: token });
             } else {
                 res.status(401).send({ message: 'Failed to login' })
@@ -223,14 +198,24 @@ app.post('/validate_token', async (req: Request, res: Response) => {
     }
 
     // if there was a token, check it
-    const decoded = jwt.verify(req.body.token, 'private_key');
+    // const decoded = jwt.verify(req.body.token, secret_key);
+    // if (!decoded) {
+    //     console.log("jwt -- failed to decode token, invalid secret_key");
+    //     return;
+    // }
 
-    await pool.query('SELECT * FROM users WHERE username = $1', [decoded.username], (error: any, results: QueryResult) => {
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
+
+    await pool.query('SELECT * FROM users WHERE username = $1', [username], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else {
             if (results.rowCount > 0) {
-                if (results.rows[0].username == decoded.username) {
-                    res.status(200).send({ valid_token: true, username: decoded.username });
+                if (results.rows[0].username == username) {
+                    res.status(200).send({ valid_token: true, username: username });
                 }
             } else {
                 res.status(200).send({ valid_token: false, username: null });
@@ -241,7 +226,11 @@ app.post('/validate_token', async (req: Request, res: Response) => {
 app.post('/delete_transaction', async function (req: Request, res: Response) {
     console.log("delete_transaction route");
     const transaction_id = req.body.transaction_id;
-    const username = jwt.decode(req.body.token, 'private_key').username;
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
 
     const transaction_query = await pool.query('SELECT * FROM transactions WHERE username = $1 AND id = $2', [username, transaction_id]);
     const transaction_data = transaction_query.rows[0];
@@ -261,9 +250,13 @@ app.post('/delete_transaction', async function (req: Request, res: Response) {
 })
 
 app.post('/get_transactions', function (req: Request, res: Response) {
-    const decoded = jwt.verify(req.body.token, 'private_key');
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
 
-    pool.query('SELECT * FROM transactions WHERE username = $1', [decoded.username], (error: any, results: QueryResult) => {
+    pool.query('SELECT * FROM transactions WHERE username = $1', [username], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else {
             res.status(200).send({ transactions: results.rows });
@@ -273,7 +266,11 @@ app.post('/get_transactions', function (req: Request, res: Response) {
 
 app.post('/get_time_period_data', async function (req: Request, res: Response) {
     console.log("Route -> /get_time_period_data");
-    const decoded = jwt.verify(req.body.token, 'private_key');
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
     const time_period = req.body.time_period;
 
     const date = new Date();
@@ -309,7 +306,7 @@ app.post('/get_time_period_data', async function (req: Request, res: Response) {
         return;
     }
 
-    const query_resp: QueryResult = await pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [decoded.username, start, end]);
+    const query_resp: QueryResult = await pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, start, end]);
     console.log(query_resp.rows);
 
     const data = {num_transactions: query_resp.rowCount, money_spent: 0};
@@ -336,7 +333,11 @@ app.post('/get_time_period_data', async function (req: Request, res: Response) {
 })
 
 app.post('/get_month_data', function (req: Request, res: Response) {
-    const decoded = jwt.verify(req.body.token, 'private_key');
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
 
     const date = new Date();
     const year = date.getFullYear();
@@ -345,7 +346,7 @@ app.post('/get_month_data', function (req: Request, res: Response) {
     const start = new Date(year, month);
     const end = new Date(year, month, days_in_month);
 
-    pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [decoded.username, start, end], (error: any, results: QueryResult) => {
+    pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, start, end], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else {
             res.status(200).send({ transactions: results.rows });
@@ -355,20 +356,28 @@ app.post('/get_month_data', function (req: Request, res: Response) {
 
 app.post('/get_week_data', function (req: Request, res: Response) {
     console.log("get_week_data route");
-    const decoded = jwt.verify(req.body.token, 'private_key');
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
 
     const date = new Date;
     const first_day = start_of_week(date);
     const last_day = end_of_week(date);
 
-    pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [decoded.username, first_day, last_day], (error: any, results: QueryResult) => {
+    pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, first_day, last_day], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else { res.status(200).send({ transactions: results.rows }); }
     })
 })
 
 app.post('/get_day_data', function (req: Request, res: Response) {
-    const decoded = jwt.verify(req.body.token, 'private_key');
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
 
     const date = new Date;
     // const first = date.getDate() - date.getDay(); // First day is the day of the month - the day of the week
@@ -379,7 +388,7 @@ app.post('/get_day_data', function (req: Request, res: Response) {
     // console.log("first: " + first_day);
     // console.log("last: " + last_day);
 
-    pool.query('SELECT * FROM transactions WHERE username = $1 AND date = $2', [decoded.username, date], (error: any, results: QueryResult) => {
+    pool.query('SELECT * FROM transactions WHERE username = $1 AND date = $2', [username, date], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else {
             res.status(200).send({ transactions: results.rows });
@@ -388,7 +397,11 @@ app.post('/get_day_data', function (req: Request, res: Response) {
 })
 
 app.post('/get_transaction_numbers_data', async function(req: Request, res: Response) {
-    const username = jwt.verify(req.body.token, 'private_key').username;
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
   
     const date = new Date();
     const year = date.getFullYear();
@@ -443,9 +456,13 @@ app.post('/get_transaction_numbers_data', async function(req: Request, res: Resp
 
 app.post('/get_tags', function (req: Request, res: Response) {
     console.log("get_tags route");
-    const decoded = jwt.verify(req.body.token, 'private_key');
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
 
-    pool.query('SELECT * FROM tags WHERE username = $1', [decoded.username], (error: any, results: QueryResult) => {
+    pool.query('SELECT * FROM tags WHERE username = $1', [username], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else {
             res.status(200).send({ tags: results.rows });
@@ -455,9 +472,13 @@ app.post('/get_tags', function (req: Request, res: Response) {
 
 app.post('/get_popular_tags', function (req: Request, res: Response) {
     console.log("get_popular_tags route");
-    const decoded = jwt.verify(req.body.token, 'private_key');
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
 
-    pool.query('SELECT * FROM transactions WHERE username = $1', [decoded.username], (error: any, results: QueryResult) => {
+    pool.query('SELECT * FROM transactions WHERE username = $1', [username], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else {
             interface Popular_Tag {
@@ -497,7 +518,11 @@ app.post('/get_popular_tags', function (req: Request, res: Response) {
 
 app.post('/get_amount_spent_by_tags', function (req: Request, res: Response) {
     console.log("get_amount_spent_by_tags route");
-    const decoded = jwt.verify(req.body.token, 'private_key');
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
     const time_period = req.body.time_period;
 
     const date = new Date();
@@ -523,7 +548,7 @@ app.post('/get_amount_spent_by_tags', function (req: Request, res: Response) {
     console.log("end: " + end);
 
     // only get data for this month??
-    pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [decoded.username, start, end], (error: any, results: QueryResult) => {
+    pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, start, end], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else {
             console.log("row_count: " + results.rowCount)
