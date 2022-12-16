@@ -1,22 +1,18 @@
 const express = require('express');
 const cors = require('cors')
 const bodyParser = require('body-parser');
-const superagent = require('superagent');
 const Pool = require('pg').Pool;
 const jwt = require('jsonwebtoken');
 const start_of_week = require('date-fns/startOfWeek');
 const end_of_week = require('date-fns/endOfWeek');
 const is_same_day = require('date-fns/isSameDay');
-const addDays = require('date-fns/addDays')
 import { endOfMonth, endOfWeek, endOfYear, startOfMonth, startOfWeek, startOfYear } from 'date-fns';
 import { Request, Response } from 'express';
-import { Client, QueryResult } from 'pg';
+import { Client, DatabaseError, QueryResult } from 'pg';
 
 // check /root and base of project for .env files
 require('dotenv').config({path:'/root/.env'})
 require('dotenv').config()
-
-console.log(process.env.JWT_SECRET_KEY);
 
 const secret_key = process.env.JWT_SECRET_KEY;
 
@@ -127,6 +123,59 @@ app.post('/create_transaction', (req: Request, res: Response) => {
     })    
 })
 
+app.post('/update_transaction', (req: Request, res: Response) => {
+    console.log("Route -> /update_transaction");
+    const transaction = req.body.transaction;
+    console.log(transaction);
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
+
+    pool.query('UPDATE transactions SET name = $3, date = $4, tags = $5, value = $6 WHERE username = $1 AND id = $2', [username, transaction.id, transaction.name, new Date(transaction.date), transaction.tags, transaction.value], (error: Error, results: QueryResult) => {
+        if (error) console.log(error);
+        else {
+            res.send("updated transaction successfully");
+        }
+    })
+
+    // pool.query('INSERT INTO transactions (name, date, tags, username, value) VALUES ($1, $2, $3, $4, $5)', [transaction.name, new Date(transaction.date), transaction.tags, username, transaction.value], (error: Error, results: QueryResult) => {
+    //     if (error) console.log(error);
+    //     else {
+    //         res.send("created transaction successfully!")
+    //     }
+    // })
+
+    // check tags against existing tags for user
+    // if there are new tags then add them to the tags db
+    pool.query('SELECT * FROM tags WHERE username = $1', [username], (error: Error, results: QueryResult) => {
+        if (error) console.log(error);
+        else {
+            // console.log(results.rows)
+            const tags_that_dont_exist: string[] = [];
+            transaction.tags.forEach((tag: string) => {
+                let tag_exists = false;
+                results.rows.forEach((row, i) => {
+                    if (tag == row.value) {
+                        tag_exists = true;
+                    }
+                });
+
+                if (!tag_exists) {
+                    tags_that_dont_exist.push(tag);
+                }
+            });
+            
+            tags_that_dont_exist.forEach(tag => {
+                pool.query('INSERT INTO tags (value, username) VALUES ($1, $2)', [tag, username], (error: Error, results: QueryResult) => {
+                    if (error) console.log(error);
+                })
+            });
+        }
+    })    
+})
+
 app.get('/', (req: Request, res: Response) => {
     res.status(200).send("Hello from Budget Server!");
 });
@@ -143,7 +192,7 @@ app.post('/register_user', function (req: Request, res: Response) {
         return;
     }
 
-    pool.query('INSERT INTO users (email, username, password) VALUES ($1, $2, $3)', [email, username, password], (error: any, results: QueryResult) => {
+    pool.query('INSERT INTO users (email, username, password) VALUES ($1, $2, $3)', [email, username, password], (error: DatabaseError, results: QueryResult) => {
         if (error) {
             console.log(error.constraint)
             if (error.constraint == 'unique_email') {
@@ -197,13 +246,6 @@ app.post('/validate_token', async (req: Request, res: Response) => {
         return;
     }
 
-    // if there was a token, check it
-    // const decoded = jwt.verify(req.body.token, secret_key);
-    // if (!decoded) {
-    //     console.log("jwt -- failed to decode token, invalid secret_key");
-    //     return;
-    // }
-
     const username = get_username(req.body.token);
     if (!username) {
         res.status(401).send({ message: "Error -- Invalid token." });
@@ -234,11 +276,6 @@ app.post('/delete_transaction', async function (req: Request, res: Response) {
 
     const transaction_query = await pool.query('SELECT * FROM transactions WHERE username = $1 AND id = $2', [username, transaction_id]);
     const transaction_data = transaction_query.rows[0];
-
-    // console.log('transaction_data')
-    // console.log(transaction_data)
-
-    const transaction_amount = parseFloat(transaction_data.amount);
 
     pool.query('DELETE FROM transactions WHERE username = $1 AND name = $2 AND id = $3', [username, transaction_data.name, transaction_data.id], (error: any, results: QueryResult) => {
         if (error) console.log(error);
@@ -307,7 +344,6 @@ app.post('/get_time_period_data', async function (req: Request, res: Response) {
     }
 
     const query_resp: QueryResult = await pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, start, end]);
-    console.log(query_resp.rows);
 
     const data = {num_transactions: query_resp.rowCount, money_spent: 0};
     
@@ -316,21 +352,27 @@ app.post('/get_time_period_data', async function (req: Request, res: Response) {
     });
 
     res.status(200).send(data);
-
-    // const date = new Date();
-    // const year = date.getFullYear();
-    // const month = date.getMonth();
-    // const days_in_month = new Date(year, month, 0).getDate() + 1;
-    // const start = new Date(year, month);
-    // const end = new Date(year, month, days_in_month);
-
-    // pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [decoded.username, start, end], (error: any, results: QueryResult) => {
-    //     if (error) console.log(error);
-    //     else {
-    //         res.status(200).send({ transactions: results.rows });
-    //     }
-    // })
 })
+
+app.post('/get_year_data', function (req: Request, res: Response) {
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
+
+    const date = new Date();
+    const first_day_of_year = startOfYear(date);
+    const last_day_of_year = endOfYear(date);
+
+    pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, first_day_of_year, last_day_of_year], (error: any, results: QueryResult) => {
+        if (error) console.log(error);
+        else {
+            res.status(200).send({ transactions: results.rows });
+        }
+    })
+})
+
 
 app.post('/get_month_data', function (req: Request, res: Response) {
     const username = get_username(req.body.token);
@@ -380,13 +422,6 @@ app.post('/get_day_data', function (req: Request, res: Response) {
     }
 
     const date = new Date;
-    // const first = date.getDate() - date.getDay(); // First day is the day of the month - the day of the week
-    // const last = first + 6; // last day is the first day + 6  
-
-    // const first_day = new Date(date.setDate(first));
-    // const last_day = new Date(date.setDate(last));
-    // console.log("first: " + first_day);
-    // console.log("last: " + last_day);
 
     pool.query('SELECT * FROM transactions WHERE username = $1 AND date = $2', [username, date], (error: any, results: QueryResult) => {
         if (error) console.log(error);
@@ -409,12 +444,6 @@ app.post('/get_transaction_numbers_data', async function(req: Request, res: Resp
     const days_in_month = new Date(year, month, 0).getDate() + 1;
     const month_start = new Date(year, month);
     const month_end = new Date(year, month, days_in_month);
-
-    const first = date.getDate() - date.getDay(); // First day is the day of the month - the day of the week
-    const last = first + 6; // last day is the first day + 6  
-
-    // const first_day_week = new Date(date.setDate(first));
-    // const last_day_week = new Date(date.setDate(last));
     
     const first_day_week = start_of_week(date);
     const last_day_week = end_of_week(date);
@@ -426,7 +455,6 @@ app.post('/get_transaction_numbers_data', async function(req: Request, res: Resp
 
 
     const transactions = await pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, month_start, month_end]);
-    // console.log(transactions.rows)
     const rows = transactions.rows;
 
     let num_month_transactions = 0;
@@ -435,7 +463,6 @@ app.post('/get_transaction_numbers_data', async function(req: Request, res: Resp
 
     for (let i = 0; i < rows.length; i++) {
         const t_date = new Date(rows[i].date);
-        console.log("t_date: " + t_date)
         if (t_date > month_start) num_month_transactions++;
 
         if (t_date >= first_day_week && t_date <= last_day_week) num_week_transactions++;
@@ -510,7 +537,6 @@ app.post('/get_popular_tags', function (req: Request, res: Response) {
               
             popular_tags.sort((a, b) => {return b.count - a.count});
 
-            // console.log(popular_tags);
             res.status(200).send({ popular_tags: popular_tags });
         }
     })
@@ -523,15 +549,9 @@ app.post('/get_amount_spent_by_tags', function (req: Request, res: Response) {
         res.status(401).send({ message: "Error -- Invalid token." });
         return;
     }
+
     const time_period = req.body.time_period;
-
     const date = new Date();
-    const year = date.getFullYear();
-    // const month = date.getMonth();
-    // const days_in_month = new Date(year, month, 0).getDate() + 1;
-    // const month_start = new Date(year, month);
-    // const month_end = new Date(year, month, days_in_month);
-
     let start = null;
     let end = null;
 
@@ -551,11 +571,9 @@ app.post('/get_amount_spent_by_tags', function (req: Request, res: Response) {
     pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, start, end], (error: any, results: QueryResult) => {
         if (error) console.log(error);
         else {
-            console.log("row_count: " + results.rowCount)
             const spending_tags: Spending_Tag[] = [];
             for (let i = 0; i < results.rows.length; i++) {
                 const transaction: Transaction = results.rows[i];
-                console.log("transaction: ", transaction)
 
                 transaction.tags.forEach((transaction_tag: string) => {
                     let matched = false;
@@ -575,15 +593,63 @@ app.post('/get_amount_spent_by_tags', function (req: Request, res: Response) {
                     }
                 });
             }
-
-            if (spending_tags.length == 0) {
-                
-            }
               
             spending_tags.sort((a, b) => {return b.amount - a.amount});
 
-            console.log("spending_tags: " + spending_tags);
             res.status(200).send({ spending_tags: spending_tags });
         }
     })
 });
+
+app.post('/get_transactions_by_time_period', async function (req: Request, res: Response) {
+    console.log("Route -> /get_transactions_by_time_period");
+    const username = get_username(req.body.token);
+    if (!username) {
+        res.status(401).send({ message: "Error -- Invalid token." });
+        return;
+    }
+    const time_period = req.body.time_period;
+
+    const date = new Date();
+    let start = null;
+    let end = null;
+
+    if (time_period == 0) {
+        console.log("time_period: day");
+        start = new Date();
+        end = new Date();
+        // addDays(start, 1);
+    } else if (time_period == 1) {
+        console.log("time_period: week");
+        
+        start = start_of_week(date);
+        end = end_of_week(date);
+    } else if (time_period == 2) {
+        console.log("time_period: month");
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const days_in_month = new Date(year, month, 0).getDate() + 1;
+        start = new Date(year, month);
+        end = new Date(year, month, days_in_month);
+    }
+    else if (time_period == 3) {
+        console.log("time_period: year");
+        start = startOfYear(date);
+        end = endOfYear(date);
+    }
+
+    if (!start || !end) {
+        res.status(200).send("Blah");
+        return;
+    }
+
+    const query_resp: QueryResult = await pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, start, end]);
+
+    const data = {transactions: query_resp.rows};
+    
+    // query_resp.rows.forEach(row => {
+    //     data.money_spent += row.value;
+    // });
+
+    res.status(200).send(data);
+})
