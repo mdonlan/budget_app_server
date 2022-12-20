@@ -87,7 +87,8 @@ app.post('/create_transaction', (req: Request, res: Response) => {
         return;
     }
 
-    pool.query('INSERT INTO transactions (name, date, tags, username, value) VALUES ($1, $2, $3, $4, $5)', [transaction.name, new Date(transaction.date), transaction.tags, username, transaction.value], (error: Error, results: QueryResult) => {
+    pool.query('INSERT INTO transactions (name, date, tags, username, value, is_inflow) VALUES ($1, $2, $3, $4, $5, $6)', 
+        [transaction.name, new Date(transaction.date), transaction.tags, username, transaction.value, transaction.is_inflow], (error: Error, results: QueryResult) => {
         if (error) console.log(error);
         else {
             res.send("created transaction successfully!")
@@ -133,7 +134,8 @@ app.post('/update_transaction', (req: Request, res: Response) => {
         return;
     }
 
-    pool.query('UPDATE transactions SET name = $3, date = $4, tags = $5, value = $6 WHERE username = $1 AND id = $2', [username, transaction.id, transaction.name, new Date(transaction.date), transaction.tags, transaction.value], (error: Error, results: QueryResult) => {
+    pool.query('UPDATE transactions SET name = $3, date = $4, tags = $5, value = $6, is_inflow = $7 WHERE username = $1 AND id = $2', 
+        [username, transaction.id, transaction.name, new Date(transaction.date), transaction.tags, transaction.value, transaction.is_inflow], (error: Error, results: QueryResult) => {
         if (error) console.log(error);
         else {
             res.send("updated transaction successfully");
