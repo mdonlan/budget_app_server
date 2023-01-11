@@ -312,7 +312,9 @@ app.post('/get_time_period_data', async function (req: Request, res: Response) {
     }
     const time_period = req.body.time_period;
 
-    const date = new Date();
+    // console.log(req.body)
+
+    const date = new Date(req.body.date);
     let start = null;
     let end = null;
 
@@ -347,10 +349,14 @@ app.post('/get_time_period_data', async function (req: Request, res: Response) {
 
     const query_resp: QueryResult = await pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, start, end]);
 
-    const data = {num_transactions: query_resp.rowCount, money_spent: 0};
+    const data = {num_transactions: query_resp.rowCount, expenses: 0, income: 0};
     
     query_resp.rows.forEach(row => {
-        data.money_spent += row.value;
+        if (!row.is_inflow) {
+            data.expenses += row.value;
+        } else {
+            data.income += row.value;
+        }
     });
 
     res.status(200).send(data);
@@ -383,7 +389,20 @@ app.post('/get_month_data', function (req: Request, res: Response) {
         return;
     }
 
-    const date = new Date();
+    console.log("month data");
+    console.log(req.body.date)
+
+    // check if there is a data sent with the request
+    // if so use that as the month, otherwise use the current month
+    let date = null;
+    if (req.body.date) {
+        date = new Date(req.body.date);
+    } else {
+        date = new Date();
+    }
+
+    // const date = new Date();
+    console.log(date)
     const year = date.getFullYear();
     const month = date.getMonth();
     const days_in_month = new Date(year, month, 0).getDate() + 1;
@@ -406,7 +425,7 @@ app.post('/get_week_data', function (req: Request, res: Response) {
         return;
     }
 
-    const date = new Date;
+    const date = new Date(req.body.date);
     const first_day = start_of_week(date);
     const last_day = end_of_week(date);
 
@@ -553,7 +572,7 @@ app.post('/get_amount_spent_by_tags', function (req: Request, res: Response) {
     }
 
     const time_period = req.body.time_period;
-    const date = new Date();
+    const date = new Date(req.body.date);
     let start = null;
     let end = null;
 
@@ -612,7 +631,7 @@ app.post('/get_transactions_by_time_period', async function (req: Request, res: 
     }
     const time_period = req.body.time_period;
 
-    const date = new Date();
+    const date = new Date(req.body.date);
     let start = null;
     let end = null;
 
