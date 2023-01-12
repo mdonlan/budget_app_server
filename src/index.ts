@@ -11,7 +11,7 @@ import { Request, Response } from 'express';
 import { Client, DatabaseError, QueryResult } from 'pg';
 
 // check /root and base of project for .env files
-require('dotenv').config({path:'/root/.env'})
+require('dotenv').config({path:'/home/michael/.env'})
 require('dotenv').config()
 
 const secret_key = process.env.JWT_SECRET_KEY;
