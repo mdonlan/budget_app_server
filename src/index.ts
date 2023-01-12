@@ -49,20 +49,20 @@ app.use(bodyParser.json());
 
 const port = 3001;
 
-const formatMemoryUsage = (data: any) => `${Math.round(data / 1024 / 1024 * 100) / 100} MB`;
+// const formatMemoryUsage = (data: any) => `${Math.round(data / 1024 / 1024 * 100) / 100} MB`;
 
-setInterval(() => {
-const memoryData = process.memoryUsage();
+// setInterval(() => {
+// const memoryData = process.memoryUsage();
 
-const memoryUsage = {
-  rss: `${formatMemoryUsage(memoryData.rss)} -> Resident Set Size - total memory allocated for the process execution`,
-  heapTotal: `${formatMemoryUsage(memoryData.heapTotal)} -> total size of the allocated heap`,
-  heapUsed: `${formatMemoryUsage(memoryData.heapUsed)} -> actual memory used during the execution`,
-  external: `${formatMemoryUsage(memoryData.external)} -> V8 external memory`,
-};
+// const memoryUsage = {
+//   rss: `${formatMemoryUsage(memoryData.rss)} -> Resident Set Size - total memory allocated for the process execution`,
+//   heapTotal: `${formatMemoryUsage(memoryData.heapTotal)} -> total size of the allocated heap`,
+//   heapUsed: `${formatMemoryUsage(memoryData.heapUsed)} -> actual memory used during the execution`,
+//   external: `${formatMemoryUsage(memoryData.external)} -> V8 external memory`,
+// };
 
-console.log(memoryUsage);
-}, 5000)
+// console.log(memoryUsage);
+// }, 5000)
 
 
 const pool = new Pool({
