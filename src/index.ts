@@ -56,11 +56,6 @@ const pool = new Pool({
     database: 'budget_app',
 })
 
-// pool.on('connect', (client: Client) => {
-//     console.log('connected to pool');
-//     // console.log(client)
-// })
-
 pool.on('error', (err: Error, client: Client) => {
     console.log("POOL ERROR");
     console.log(err);
