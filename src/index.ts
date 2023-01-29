@@ -39,6 +39,7 @@ export interface Transaction {
     tags: string[];
     value: number;
     username: string;
+    is_inflow: boolean;
 };
 
 export enum Time_Period {

@@ -36,6 +36,8 @@ export function get_amount_spent_by_tags(req: any, res: any) {
             for (let i = 0; i < results.rows.length; i++) {
                 const transaction: Transaction = results.rows[i];
 
+                if (transaction.is_inflow) continue;
+
                 transaction.tags.forEach((transaction_tag: string) => {
                     let matched = false;
                     spending_tags.forEach((spending_tag: Spending_Tag) => {
