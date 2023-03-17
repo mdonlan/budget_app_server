@@ -3,6 +3,13 @@ import { pool } from "../db";
 import { QueryResult } from "pg";
 import { startOfWeek, endOfWeek, startOfYear, endOfYear } from "date-fns";
 
+interface Time_Period_Data {
+    num_transactions: number;
+    expenses: number;
+    income: number;
+    transactions: any[]; // should be type Transaction
+};
+
 export async function get_time_period_data(req: any, res: any) {
     console.log("Route -> /get_time_period_data");
     const username = get_username(req.body.token);
@@ -49,7 +56,7 @@ export async function get_time_period_data(req: any, res: any) {
 
     const query_resp: QueryResult = await pool.query('SELECT * FROM transactions WHERE username = $1 AND date BETWEEN $2 AND $3', [username, start, end]);
 
-    const data = {num_transactions: query_resp.rowCount, expenses: 0, income: 0};
+    const data: Time_Period_Data = {num_transactions: query_resp.rowCount, expenses: 0, income: 0, transactions: query_resp.rows};
     
     query_resp.rows.forEach(row => {
         if (!row.is_inflow) {
